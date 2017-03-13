@@ -4,12 +4,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("RustInterceptor")]
-[assembly: AssemblyDescription("A Rust proxied packet sniffer")]
+[assembly: AssemblyTitle("OxideInterceptor")]
+[assembly: AssemblyDescription("Game sniffer")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Sharp Umbrella")]
-[assembly: AssemblyProduct("RustInterceptor")]
-[assembly: AssemblyCopyright("Copyright ©  2016")]
+[assembly: AssemblyCompany("Duque-PC")]
+[assembly: AssemblyProduct("OxideInterceptor")]
+[assembly: AssemblyCopyright("Copyright ©  2017")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -19,7 +19,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(true)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("683040A1-D8A8-4825-BD01-9BBAE24F48DD")]
+[assembly: Guid("61B43D77-D79B-41E9-870A-90C6010BF585")]
 [assembly: PrimaryInteropAssembly(1, 0)]
 //[assembly: ImportedFromTypeLib("")]
 

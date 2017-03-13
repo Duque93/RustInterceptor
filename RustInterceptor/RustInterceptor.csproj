@@ -9,10 +9,13 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Rust_Interceptor</RootNamespace>
     <AssemblyName>RustInterceptor</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -38,8 +41,7 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject>
-    </StartupObject>
+    <StartupObject>Rust_Interceptor.Program</StartupObject>
   </PropertyGroup>
   <PropertyGroup />
   <ItemGroup>
@@ -50,6 +52,22 @@
     <Reference Include="Rust.Data, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\Steam Juegos\steamapps\common\Rust\RustClient_Data\Managed\Rust.Data.dll</HintPath>
+    </Reference>
+    <Reference Include="SharpDX, Version=3.1.1.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>packages\SharpDX.3.1.1\lib\net45\SharpDX.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="SharpDX.Direct2D1, Version=3.1.1.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>packages\SharpDX.Direct2D1.3.1.1\lib\net45\SharpDX.Direct2D1.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="SharpDX.DXGI, Version=3.1.1.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>packages\SharpDX.DXGI.3.1.1\lib\net45\SharpDX.DXGI.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="SharpDX.Mathematics, Version=3.1.1.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>packages\SharpDX.Mathematics.3.1.1\lib\net45\SharpDX.Mathematics.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -80,6 +98,12 @@
     <Compile Include="Data\GroupLeave.cs" />
     <Compile Include="Data\Message.cs" />
     <Compile Include="Data\RPCMessage.cs" />
+    <Compile Include="Forms\Controller.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\Controller.Designer.cs">
+      <DependentUpon>Controller.cs</DependentUpon>
+    </Compile>
     <Compile Include="Forms\Hooks\WindowHook.cs" />
     <Compile Include="Forms\Overlay.cs">
       <SubType>Form</SubType>
@@ -87,7 +111,10 @@
     <Compile Include="Forms\Overlay.Designer.cs">
       <DependentUpon>Overlay.cs</DependentUpon>
     </Compile>
+    <Compile Include="Forms\Utils\ControllerSystemInfo.cs" />
     <Compile Include="Forms\Structs\WindowStruct.cs" />
+    <Compile Include="Forms\Utils\DLLImports.cs" />
+    <Compile Include="Forms\Utils\DrawingUtils.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="ProtoGen.cs" />
     <Compile Include="SimpleInterceptor.cs" />
@@ -110,11 +137,16 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Forms\Controller.resx">
+      <DependentUpon>Controller.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Forms\Overlay.es.resx">
       <DependentUpon>Overlay.cs</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\Overlay.resx">
       <DependentUpon>Overlay.cs</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

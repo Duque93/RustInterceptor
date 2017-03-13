@@ -1,13 +1,15 @@
 ﻿using Rust_Interceptor.Data;
 using Rust_Interceptor.Forms.Hooks;
+using Rust_Interceptor.Forms.Structs;
+using Rust_Interceptor.Forms.Utils;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -22,17 +24,21 @@ namespace Rust_Interceptor.Forms
         private Point lastLocation;
         //////////////////////////////////////////
 
-        public bool working = false;
+        public volatile bool working = false;
         private RustInterceptor sniffer;
         private Thread worker;
         private Process rustProcess;
         private readonly String rustProcessName = "RustClient";
 
-        private System.Collections.Generic.HashSet<Entity> listaUsuarios = new HashSet<Entity>();
-        private delegate void genericCallback();
+        private ConcurrentDictionary<uint,Entity> listaUsuarios = new ConcurrentDictionary<uint, Entity>();
+        //private HashSet<Entity> listaUsuarios = new HashSet<Entity>();
+        private Entity localPlayer;
+
+        Graphics g;
 
         public Overlay()
         {
+            this.Location = new Point(0, 0);
             InitializeComponent();
         }
 
@@ -44,7 +50,7 @@ namespace Rust_Interceptor.Forms
         private void Overlay_Load(object sender, EventArgs e)
         {
             //this.MaximumSize = this.Size;
-
+            //g = this.CreateGraphics();
             this.labelIp.Click += new EventHandler(
                 (object responsable, EventArgs evento) =>
                 {
@@ -58,10 +64,22 @@ namespace Rust_Interceptor.Forms
             this.buttonEmpezar.Click += new EventHandler(
                 (object responsable, EventArgs evento) =>
                 {
-                    this.working = true;
+                    if (this.textBoxIp.Text.Length == 0 && this.textBoxPuerto.Text.Length == 0)
+                        return;
+                    if (this.textBoxIp.Text.Equals("debug"))
+                    {
+                        this.hideControls();
+                        this.Size = new Size(ControllerSystemInfo.getSystemInfo(ControllerSystemInfo.SystemMetric.SM_CXFULLSCREEN), ControllerSystemInfo.getSystemInfo(ControllerSystemInfo.SystemMetric.SM_CYFULLSCREEN));
+                        
+                        this.worldToScreen();
+                        return;
+                    }
+
+                    //this.working = true;
                     sniffer = new RustInterceptor( this.textBoxIp.Text, Convert.ToInt32(this.textBoxPuerto.Text) );
                     sniffer.AddPacketsToFilter(Packet.Rust.Entities, Packet.Rust.EntityDestroy, Packet.Rust.EntityPosition);
                     sniffer.packetHandlerCallback = packetHandler;
+                    sniffer.RememberPackets = true;
                     this.prepareOverlay();
                 });
 
@@ -82,33 +100,13 @@ namespace Rust_Interceptor.Forms
             base.WndProc(ref m);
         }
 
-        /// <summary>
-        /// Changes an attribute of the specified window. The function also sets the 32-bit (long) value at the specified offset into the extra window memory.
-        /// </summary>
-        /// <param name="hWnd">A handle to the window and, indirectly, the class to which the window belongs..</param>
-        /// <param name="nIndex">The zero-based offset to the value to be set. Valid values are in the range zero through the number of bytes of extra window memory, minus the size of an integer. To set any other value, specify one of the following values: GWL_EXSTYLE, GWL_HINSTANCE, GWL_ID, GWL_STYLE, GWL_USERDATA, GWL_WNDPROC </param>
-        /// <param name="dwNewLong">The replacement value.</param>
-        /// <returns>If the function succeeds, the return value is the previous value of the specified 32-bit integer.
-        /// If the function fails, the return value is zero. To get extended error information, call GetLastError. </returns>
-        [DllImport("user32.dll")]
-        static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
-        [DllImport("user32.dll", SetLastError = true)]
-        static extern int GetWindowLong(IntPtr hWnd, int nIndex);
         //Oculta todos los elementos para poder tener un overlayForm
         public void prepareOverlay()
         {
-            foreach ( Control ctrl in this.Controls ) //Oculto todos los controles
-            {
-                ctrl.Visible = false;
-            }
+            this.hideControls();
             this.labelPlayers.Visible = true;
 
-            this.BackColor = Color.Black; //Seteamos el color de fondo a negro.
-            this.TransparencyKey = Color.Black; //Indicamos que todo lo que se encuentre en negro dentro del formulario sea transparente.
-
-            int initialStyle = GetWindowLong(this.Handle, -20);
-            SetWindowLong(this.Handle, -20, initialStyle | 0x80000 | 0x20);
-
+            Controller.getInstance().mostrarse();
             //Creo un Hilo que se encargara de hacer todo el curro
             worker = new Thread(
                 () =>
@@ -122,129 +120,43 @@ namespace Rust_Interceptor.Forms
                         Thread.Sleep(1 * 1000);
                     }
                     rustProcess.EnableRaisingEvents = true;
-                    rustProcess.Exited += new EventHandler( //Ahora
+                    rustProcess.Exited += new EventHandler( //En cuanto se cierre Rust, cerramos todo
                         (object sender, EventArgs e) =>
                         {
                             this.Cerrar();
                         });
+                    
+                    //¿Porque ha dejado de funcionar de pronto?
+                    //Puede ser por el cambio de propiedades de int a float que hice en RECTANGULO
+                    //new WindowHook(rustProcess.MainWindowHandle, this); //De momento esta clase se ocupa directamente de redimensionar la ventana
+                    this.resizeForm(new RECTANGULO());
 
-                    new WindowHook(rustProcess.MainWindowHandle, this);
-
-                    //sniffer.packetHandlerCallback = packetHandler;
                     sniffer.Start();
-                    do
+                    while( this.localPlayer == null) //Esperamos hasta que tengamos el localplayer
                     {
-                        worldToScreen();
-                        Thread.Sleep(50);
-                    } while (working);
-
+                        Thread.Sleep(1000);
+                    }
+                    Console.WriteLine("Me he encontrado");
+                    working = true;
+                    
+                    this.worldToScreen();
+                    
                 });
 
             worker.Start();
         }
-
-        //Se ocupara de mostrar en el overlay todo las entidades que nos interesa
-        private void worldToScreen()
+        private void hideControls()
         {
-            if (this.InvokeRequired) this.Invoke(new genericCallback(worldToScreen));
-            else
+            foreach (Control ctrl in this.Controls) //Oculto todos los controles
             {
-                Graphics g = this.CreateGraphics();
-                g.Clear(Color.Black);
-                Brush pincel = new SolidBrush(Color.Green);
-                this.drawCrosshair(g, new Pen(pincel));
-
-                this.labelPlayers.ResetText();
-                /*
-                lock (listaUsuarios)
-                {
-                    foreach (Entity entidad in listaUsuarios)
-                    {
-                        this.labelPlayers.Text += entidad.Data.basePlayer.name + " {" + entidad.Position + "} || HP -> " + entidad.Data.basePlayer.currentLife + "\n";
-                    }
-                }*/
-                //e.Graphics.DrawString("Hello World!!!", fuente, pincel , 0, 0);
-                /*
-                System.Drawing.Rectangle rectangle = new System.Drawing.Rectangle( 50, 50, 150, 150);
-                graphics.DrawEllipse(System.Drawing.Pens.Black, rectangle);
-                graphics.DrawRectangle(System.Drawing.Pens.Red, rectangle);
-                graphics.Clear(Color.Black);
-                */
+                ctrl.Visible = false;
             }
+            this.BackColor = Color.Green; //Seteamos el color de fondo a negro.
+            this.TransparencyKey = Color.Green; //Indicamos que todo lo que se encuentre en negro dentro del formulario sea transparente
 
+            int initialStyle = DLLImports.GetWindowLong(this.Handle, -20);
+            DLLImports.SetWindowLong(this.Handle, -20, initialStyle | 0x80000 | 0x20);
         }
-
-        private void packetHandler(Packet packet)
-        {
-            Entity entity;
-            switch (packet.rustID)
-            {
-                case Packet.Rust.Entities:
-                    ProtoBuf.Entity entityInfo;
-                    uint num = Data.Entity.ParseEntity(packet, out entityInfo);
-                    entity = Entity.CreateOrUpdate(num, entityInfo);
-                    if (entity != null)
-                    {
-                        if (entity.IsPlayer)
-                        {
-                            if(!entity.IsLocalPlayer)  listaUsuarios.Add(entity);
-                        }
-                    }
-                return;
-                case Packet.Rust.EntityPosition:
-                    List<Data.Entity.EntityUpdate> updates = Data.Entity.ParsePositions(packet);
-                    List<Entity> entities = null;
-                    if (updates.Count == 1)
-                    {
-                        entity = Entity.UpdatePosistion(updates[0]);
-                        if (entity != null)
-                        {
-                            if (entity.IsPlayer)
-                            {
-                                if (!entity.IsLocalPlayer)
-                                {
-                                    (entities = new List<Entity>()).Add(entity);
-                                }
-                            }
-                           
-                        }
-                    }
-                    else if (updates.Count > 1)
-                    {
-                        entities = Entity.UpdatePositions(updates);
-                    }
-                    if (entities != null)
-                    {
-                        this.resetText(this.labelPlayers);
-                        entities.ForEach(entidad =>
-                        {
-                            this.appendText( this.labelPlayers,entidad.Data.basePlayer.name + " {" + entidad.Position + "} || HP -> " + entidad.Data.basePlayer.currentLife + "\n" );
-                        });
-                    }
-                 break;
-            }
-        }
-        
-
-
-
-
-
-
-        private void drawCrosshair(Graphics g, Pen lapiz)
-        {
-            lapiz.Width = 1;
-            lapiz.Color = Color.Red;
-            //linea horizontal
-            Point middleMinorH = new Point((this.Width / 2) - 5, (this.Height / 2));
-            Point middleMayorH = new Point((this.Width / 2) + 5, (this.Height / 2));
-            g.DrawLine(lapiz, middleMinorH, middleMayorH);
-            //linea vertical
-            Point middleMinorV = new Point((this.Width / 2), (this.Height / 2) - 5);
-            Point middleMayorV = new Point((this.Width / 2), (this.Height / 2) + 5);
-            g.DrawLine(lapiz, middleMinorV, middleMayorV);
-        }
-
         private void searchRustProcess(out Process proceso)
         {
             Process[] procesos = Process.GetProcessesByName(rustProcessName);
@@ -255,7 +167,115 @@ namespace Rust_Interceptor.Forms
                 proceso = procesos[0];
             }
         }
+        private void packetHandler(Packet packet)
+        {
+            Entity entity;
+            switch (packet.rustID)
+            {
+                case Packet.Rust.Entities:
+                    ProtoBuf.Entity entityInfo;
+                    uint num = Data.Entity.ParseEntity(packet, out entityInfo);
+                    entity = Entity.CreateOrUpdate(num, entityInfo);
+                    if (entity != null) onEntity(entity);
+                    return;
+                case Packet.Rust.EntityPosition:
+                    List<Data.Entity.EntityUpdate> updates = Data.Entity.ParsePositions(packet);
+                    List<Entity> entities = null;
+                    if (updates.Count == 1)
+                    {
+                        entity = Entity.UpdatePosistion(updates[0]);
+                        if (entity != null) (entities = new List<Entity>()).Add(entity);
+                    }
+                    else if (updates.Count > 1)
+                    {
+                        entities = Entity.UpdatePositions(updates);
+                    }
+                    if (entities != null) entities.ForEach(item => onEntity(item));
+                    
+                    return;
+                case Packet.Rust.EntityDestroy:
+                    EntityDestroy destroyInfo = new EntityDestroy(packet);
+                    Entity.CreateOrUpdate(destroyInfo);
+                    //onEntityDestroy(destroyInfo);
+                    return;
+            }
+        }
 
+        private delegate void onEntityCallback(Entity entidad);
+        private void onEntity(Entity entidad)
+        {
+            if (this.InvokeRequired) this.Invoke(new onEntityCallback(onEntity) , entidad );
+            else
+            {
+                if (entidad.IsPlayer)
+                {
+                    if (entidad.IsLocalPlayer)
+                    {
+                        this.localPlayer = entidad;
+                        return;
+                    }
+                    if(this.localPlayer != null)
+                    {
+                        lock(this.listaUsuarios)
+                        {
+                            //Una especie de OnAcercarse()
+                            //if (UnityEngine.Vector3.Distance(entidad.Data.baseEntity.pos, this.localPlayer.Data.baseEntity.pos) < 1000)
+                            {
+                                /*
+                                if (this.listaUsuarios.Keys.Contains(entidad.UID)) //Si no lo contiene
+                                    this.listaUsuarios.
+                                    this.listaUsuarios.TryRemove(entidad.UID);*/
+                                this.listaUsuarios.TryAdd(entidad.UID, entidad);
+                            }
+                            /*else
+                                this.listaUsuarios.TryRemove(entidad.UID,out entidad);*/
+                        }
+                    }
+                    
+                }
+            }
+        }
+        private delegate void onEntityDestroyCallback(EntityDestroy entidad);
+        private void onEntityDestroy(EntityDestroy entidadDestruida) //Nunca se esta llamando actualmente
+        {
+            if (this.InvokeRequired) this.Invoke(new onEntityDestroyCallback(onEntityDestroy), entidadDestruida);
+            else
+            {
+                lock (this.listaUsuarios)
+                {
+                    Entity entidad;
+                    this.listaUsuarios.TryGetValue(entidadDestruida.UID,out entidad);
+                    if (this.listaUsuarios.TryRemove(entidadDestruida.UID, out entidad))
+                    {
+                        //Console.WriteLine("Jugador con UID({0}) got destroyed ", entidadDestruida.UID);
+                    }
+                }
+               
+            }
+                
+        }
+        //Se ocupara de mostrar en el overlay todo las entidades que nos interesa
+        private delegate void genericCallback();
+        private void worldToScreen()
+        {
+            //if (this.InvokeRequired) this.Invoke(new genericCallback(worldToScreen));
+            //else
+            do
+            {
+                g = this.CreateGraphics();
+                g.Clear(Color.Green);
+                DrawingUtils.drawCrosshair(g, Color.FromArgb(128, Color.Red), this.ClientRectangle);
+
+                int radio = 75;
+                POINT init = new POINT(this.Right - (radio * 2 + 5), this.Top + 8); //A la derecha con margenes para ver el radar al completo
+
+                DrawingUtils.drawRadar( g, Color.FromArgb(10, Color.Gray), init, this.localPlayer, this.listaUsuarios.Values.ToList() );
+                //DrawingUtils.drawRadar(g, Color.FromArgb(10, Color.Gray), init, this.localPlayer, Entity.GetPlayers().ToList() );
+                Thread.Sleep(150);
+            } while (working);
+
+
+        }
         private delegate void resetTextCallback(Control elemento);
         private void resetText(Control elemento)
         {
@@ -274,16 +294,17 @@ namespace Rust_Interceptor.Forms
                 elemento.Text += cadena;
             }
         }
-        private delegate void resizeFormCallback(RECT rectangulo);
-        public void resizeForm(RECT rectangulo)
+        private delegate void resizeFormCallback(RECTANGULO rectangulo);
+        public void resizeForm(RECTANGULO rectangulo)
         {
             if (this.InvokeRequired) this.Invoke(new resizeFormCallback(resizeForm),rectangulo);
             else
             {
-                this.Size = rectangulo.Size;
+                //this.Size = rectangulo.Size;
+                this.Size = new Size(ControllerSystemInfo.getSystemInfo(ControllerSystemInfo.SystemMetric.SM_CXFULLSCREEN), ControllerSystemInfo.getSystemInfo(ControllerSystemInfo.SystemMetric.SM_CYFULLSCREEN));
                 //Setting Window position;
                 this.Top = rectangulo.Top;
-                this.Left = rectangulo.Left;
+                this.Left =rectangulo.Left;
             }
         }
 
@@ -292,9 +313,16 @@ namespace Rust_Interceptor.Forms
             if (this.InvokeRequired) this.Invoke(new genericCallback(Cerrar));
             else
             {
+                this.working = false;
+                if (sniffer != null)
+                {
+                    if (sniffer.IsAlive)
+                    {
+                        sniffer.Stop();
+                        //sniffer.SavePackets();
+                    }
+                }
                 this.Close();
-                sniffer.Stop();
-                Application.Exit();
             }
         }
     }

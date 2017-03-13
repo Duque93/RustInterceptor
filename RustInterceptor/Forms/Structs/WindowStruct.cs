@@ -12,11 +12,11 @@ namespace Rust_Interceptor.Forms.Structs
         /// 
         /// </summary>
         [StructLayout(LayoutKind.Sequential)]
-        public struct RECT
+        public struct RECTANGULO
         {
             public int Left, Top, Right, Bottom;
 
-            public RECT(int left, int top, int right, int bottom)
+            public RECTANGULO(int left, int top, int right, int bottom)
             {
                 Left = left;
                 Top = top;
@@ -24,7 +24,7 @@ namespace Rust_Interceptor.Forms.Structs
                 Bottom = bottom;
             }
 
-            public RECT(System.Drawing.Rectangle r) : this(r.Left, r.Top, r.Right, r.Bottom) { }
+            public RECTANGULO(System.Drawing.Rectangle r) : this(r.Left, r.Top, r.Right, r.Bottom) { }
 
             public int X
             {
@@ -52,47 +52,65 @@ namespace Rust_Interceptor.Forms.Structs
 
             public System.Drawing.Point Location
             {
-                get { return new System.Drawing.Point(Left, Top); }
+                get { return new System.Drawing.Point((int)Left, (int)Top); }
                 set { X = value.X; Y = value.Y; }
             }
 
             public System.Drawing.Size Size
             {
-                get { return new System.Drawing.Size(Width, Height); }
+                get { return new System.Drawing.Size((int)Width, (int)Height); }
                 set { Width = value.Width; Height = value.Height; }
             }
-
-            public static implicit operator System.Drawing.Rectangle(RECT r)
+            public SharpDX.Vector2 CenterRelative
             {
-                return new System.Drawing.Rectangle(r.Left, r.Top, r.Width, r.Height);
+                get { return new SharpDX.Vector2(this.Width/2, this.Height/2); }
             }
 
-            public static implicit operator RECT(System.Drawing.Rectangle r)
+            public SharpDX.Vector2 CenterAbsolute
             {
-                return new RECT(r);
+                get { return new SharpDX.Vector2( (this.Width / 2)+this.Left , (this.Height / 2)+this.Top ) ; }
             }
 
-            public static bool operator ==(RECT r1, RECT r2)
+            public static implicit operator RECTANGULO(System.Drawing.Size r)
+            {
+                return new RECTANGULO(0, 0, r.Width, r.Height);
+            }
+            public static implicit operator System.Drawing.Rectangle(RECTANGULO r)
+            {
+                return new System.Drawing.Rectangle((int)r.Left, (int)r.Top, (int)r.Width, (int)r.Height);
+            }
+
+            public static implicit operator System.Drawing.RectangleF(RECTANGULO r)
+            {
+                return new System.Drawing.RectangleF(r.Left, r.Top, r.Width, r.Height);
+            }
+
+            public static implicit operator RECTANGULO(System.Drawing.Rectangle r)
+            {
+                return new RECTANGULO(r);
+            }
+
+            public static bool operator ==(RECTANGULO r1, RECTANGULO r2)
             {
                 return r1.Equals(r2);
             }
 
-            public static bool operator !=(RECT r1, RECT r2)
+            public static bool operator !=(RECTANGULO r1, RECTANGULO r2)
             {
                 return !r1.Equals(r2);
             }
 
-            public bool Equals(RECT r)
+            public bool Equals(RECTANGULO r)
             {
                 return r.Left == Left && r.Top == Top && r.Right == Right && r.Bottom == Bottom;
             }
 
             public override bool Equals(object obj)
             {
-                if (obj is RECT)
-                    return Equals((RECT)obj);
+                if (obj is RECTANGULO)
+                    return Equals((RECTANGULO)obj);
                 else if (obj is System.Drawing.Rectangle)
-                    return Equals(new RECT((System.Drawing.Rectangle)obj));
+                    return Equals(new RECTANGULO((System.Drawing.Rectangle)obj));
                 return false;
             }
 
@@ -216,7 +234,7 @@ namespace Rust_Interceptor.Forms.Structs
             /// <summary>
             /// The window's coordinates when the window is in the restored position.
             /// </summary>
-            public RECT normalPosition;
+            public RECTANGULO normalPosition;
 
             /// <summary>
             /// Gets the default (empty) value.
@@ -238,8 +256,7 @@ namespace Rust_Interceptor.Forms.Structs
         [StructLayout(LayoutKind.Sequential)]
         public struct POINT
         {
-            public int X;
-            public int Y;
+            public int X,Y;
 
             public POINT(int x, int y)
             {
@@ -249,14 +266,61 @@ namespace Rust_Interceptor.Forms.Structs
 
             public POINT(System.Drawing.Point pt) : this(pt.X, pt.Y) { }
 
-            public static implicit operator System.Drawing.Point(POINT p)
+            public double Length()
             {
-                return new System.Drawing.Point(p.X, p.Y);
+                return Math.Sqrt( Math.Pow(this.X,2) + Math.Pow(this.Y,2) );
             }
 
+            public POINT Normalize()
+            {
+                return new POINT(this.X,this.Y) / (float)this.Length();
+            }
+
+            public static POINT Vector2Y = new POINT(0,1);
+            public static POINT Vector2X = new POINT(1,0);
+
+            
+            public static POINT operator -(POINT a, POINT b)
+            {
+                return new POINT(a.X - b.X, a.Y - b.Y);
+            }
+            public static POINT operator *(POINT a,double operador)
+            {
+                return new POINT( (int)(a.X*operador), (int)(a.Y*operador));
+            }
+            public static POINT operator +(POINT a, POINT b)
+            {
+                return new POINT(a.X + b.X, a.Y + b.Y);
+            }
+            public static POINT operator /(POINT a, double operador)
+            {
+                return new POINT((int)(a.X/operador), (int)(a.Y/operador));
+            }
+
+            //Point to POINT and viceversa
+            public static implicit operator System.Drawing.Point(POINT p)
+            {
+                return new System.Drawing.Point( (int)(p.X), (int)(p.Y));
+            }
             public static implicit operator POINT(System.Drawing.Point p)
             {
                 return new POINT(p.X, p.Y);
+            }
+            //
+            //SharpDX.Vector2 to POINT
+            public static implicit operator POINT(SharpDX.Vector2 p)
+            {
+                return new POINT((int)p.X, (int)p.Y);
+            }
+
+            public static implicit operator System.Drawing.PointF(POINT p)
+            {
+                return new System.Drawing.PointF(p.X, p.Y);
+            }
+
+            public override string ToString()
+            {
+                return "{X = "+this.X+" , Y = "+this.Y+"}";
             }
         }
 

@@ -14,7 +14,7 @@ namespace Rust_Interceptor.Forms.Hooks
     {
         
         [DllImport("user32.dll", SetLastError = true)]
-        static extern bool GetWindowRect(IntPtr hwnd, out RECT lpRect);
+        static extern bool GetWindowRect(IntPtr hwnd, out RECTANGULO lpRect);
 
         /// <summary>
         /// Retrieves the show state and the restored, minimized, and maximized positions of the specified window.
@@ -57,7 +57,7 @@ namespace Rust_Interceptor.Forms.Hooks
                     Thread.CurrentThread.Name = "ResizerThread";
                     while (windowForm.working)
                     {
-                        RECT rectangulo = new RECT();
+                        RECTANGULO rectangulo = new RECTANGULO();
                         GetWindowRect(externalWindowHwnd, out rectangulo);
                         windowForm.resizeForm(rectangulo);
                         Thread.Sleep(250);

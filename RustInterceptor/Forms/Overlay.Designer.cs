@@ -71,6 +71,7 @@
             // labelPlayers
             // 
             resources.ApplyResources(this.labelPlayers, "labelPlayers");
+            this.labelPlayers.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.labelPlayers.ForeColor = System.Drawing.SystemColors.ActiveCaption;
             this.labelPlayers.Name = "labelPlayers";
             // 
@@ -87,7 +88,9 @@
             this.Controls.Add(this.textBoxIp);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.MaximizeBox = false;
+            this.MinimizeBox = false;
             this.Name = "Overlay";
+            this.ShowIcon = false;
             this.TopMost = true;
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.Overlay_FormClosed);
             this.Load += new System.EventHandler(this.Overlay_Load);
