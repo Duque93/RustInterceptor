@@ -3,11 +3,11 @@ using System.Runtime.InteropServices;
 
 namespace Rust_Interceptor.Forms.Structs
 {
-    static class ControllerSystemInfo
+    static class SystemInfo
     {
 
         [DllImport("user32.dll", SetLastError = false)]
-        private static extern IntPtr GetMessageExtraInfo();
+        public static extern IntPtr GetMessageExtraInfo();
 
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(int smIndex);

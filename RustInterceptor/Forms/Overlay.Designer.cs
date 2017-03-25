@@ -1,4 +1,11 @@
-﻿namespace Rust_Interceptor.Forms
+﻿using System;
+using Rust_Interceptor.Forms.Hooks;
+using Rust_Interceptor.Forms.Structs;
+using System.Windows.Forms;
+using static Rust_Interceptor.Forms.Structs.WindowStruct;
+using System.Threading;
+
+namespace Rust_Interceptor.Forms
 {
     partial class Overlay
     {
@@ -29,83 +36,98 @@
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Overlay));
-            this.textBoxIp = new System.Windows.Forms.TextBox();
-            this.labelIp = new System.Windows.Forms.Label();
-            this.textBoxPuerto = new System.Windows.Forms.TextBox();
-            this.labelPuerto = new System.Windows.Forms.Label();
-            this.buttonEmpezar = new System.Windows.Forms.Button();
-            this.labelPlayers = new System.Windows.Forms.Label();
             this.SuspendLayout();
-            // 
-            // textBoxIp
-            // 
-            this.textBoxIp.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            resources.ApplyResources(this.textBoxIp, "textBoxIp");
-            this.textBoxIp.Name = "textBoxIp";
-            // 
-            // labelIp
-            // 
-            resources.ApplyResources(this.labelIp, "labelIp");
-            this.labelIp.ForeColor = System.Drawing.SystemColors.ActiveCaption;
-            this.labelIp.Name = "labelIp";
-            // 
-            // textBoxPuerto
-            // 
-            this.textBoxPuerto.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            resources.ApplyResources(this.textBoxPuerto, "textBoxPuerto");
-            this.textBoxPuerto.Name = "textBoxPuerto";
-            // 
-            // labelPuerto
-            // 
-            resources.ApplyResources(this.labelPuerto, "labelPuerto");
-            this.labelPuerto.FlatStyle = System.Windows.Forms.FlatStyle.System;
-            this.labelPuerto.ForeColor = System.Drawing.SystemColors.ActiveCaption;
-            this.labelPuerto.Name = "labelPuerto";
-            // 
-            // buttonEmpezar
-            // 
-            resources.ApplyResources(this.buttonEmpezar, "buttonEmpezar");
-            this.buttonEmpezar.Name = "buttonEmpezar";
-            this.buttonEmpezar.UseVisualStyleBackColor = true;
-            // 
-            // labelPlayers
-            // 
-            resources.ApplyResources(this.labelPlayers, "labelPlayers");
-            this.labelPlayers.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.labelPlayers.ForeColor = System.Drawing.SystemColors.ActiveCaption;
-            this.labelPlayers.Name = "labelPlayers";
             // 
             // Overlay
             // 
             resources.ApplyResources(this, "$this");
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.Controls.Add(this.labelPlayers);
-            this.Controls.Add(this.buttonEmpezar);
-            this.Controls.Add(this.labelPuerto);
-            this.Controls.Add(this.textBoxPuerto);
-            this.Controls.Add(this.labelIp);
-            this.Controls.Add(this.textBoxIp);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "Overlay";
             this.ShowIcon = false;
             this.TopMost = true;
-            this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.Overlay_FormClosed);
-            this.Load += new System.EventHandler(this.Overlay_Load);
             this.ResumeLayout(false);
-            this.PerformLayout();
 
         }
 
         #endregion
 
-        private System.Windows.Forms.TextBox textBoxIp;
-        private System.Windows.Forms.Label labelIp;
-        private System.Windows.Forms.TextBox textBoxPuerto;
-        private System.Windows.Forms.Label labelPuerto;
-        private System.Windows.Forms.Button buttonEmpezar;
-        private System.Windows.Forms.Label labelPlayers;
+        internal class KeyEventListener<T> : IKeyEventsListener where T : Overlay
+        {
+            private Overlay parent;
+            private bool lDown = false, rDown = false;
+            public KeyEventListener(T parent)
+            {
+                this.parent = parent;
+            }
+
+            public bool onHorizontalWheelMouseRotation(object sender, WindowStruct.MOUSEINPUT data)
+            {
+                return true;
+            }
+
+            public bool onLeftMouseButtonDown(object sender, WindowStruct.MOUSEINPUT data)
+            {
+                lDown = true;
+                /*while(lDown && rDown)
+                {
+                    UKeyHook hook = (UKeyHook)sender;
+                    RECTANGULO rect = parent.ClientRectangle;
+                    hook.action.moveMouseToPoint(rect.CenterAbsolute + new POINT(100, 0));
+                }*/
+                return true;
+            }
+
+            public bool onLeftMouseButtonUp(object sender, WindowStruct.MOUSEINPUT data)
+            {
+                lDown = false;
+                return true;
+            }
+            
+            public bool onMiddleMouseButtonDown(object sender, WindowStruct.MOUSEINPUT data)
+            {
+               
+                return true;
+            }
+
+            public bool onMiddleMouseButtonUp(object sender, WindowStruct.MOUSEINPUT data)
+            {
+                return true;
+            }
+
+            public bool onMouseMove(object sender, WindowStruct.MOUSEINPUT data)
+            {
+                return true;
+            }
+
+            public bool onRightMouseButtonDown(object sender, WindowStruct.MOUSEINPUT data)
+            {
+                rDown = true;
+                return true;
+            }
+
+            public bool onRightMouseButtonUp(object sender, WindowStruct.MOUSEINPUT data)
+            {
+                rDown = false;
+                return true;
+            }
+
+            public bool onVerticalWheelMouseRotation(object sender, WindowStruct.MOUSEINPUT data)
+            {
+                return true;
+            }
+
+            public bool onKeyDown(object sender, KEYBDINPUT data, Keys key)
+            {
+                return true;
+            }
+            public bool onKeyUp(object sender, KEYBDINPUT data, Keys key)
+            {
+                return true;
+            }
+        }
     }
 }

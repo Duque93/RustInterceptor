@@ -42,6 +42,7 @@ namespace Rust_Interceptor.Forms.Hooks
         private Form windowForm;
 
         private Size lastSize;
+        private Thread chivato;
 
 
         public WindowHook(IntPtr externalWindowHwnd, Overlay windowForm)
@@ -50,11 +51,9 @@ namespace Rust_Interceptor.Forms.Hooks
             this.externalWindowHwnd = externalWindowHwnd;
             this.windowForm = windowForm;
 
-            new Thread(
+            chivato = new Thread(
                 () =>
                 {
-                    Thread.CurrentThread.IsBackground = true;
-                    Thread.CurrentThread.Name = "ResizerThread";
                     while (windowForm.working)
                     {
                         RECTANGULO rectangulo = new RECTANGULO();
@@ -62,7 +61,16 @@ namespace Rust_Interceptor.Forms.Hooks
                         windowForm.resizeForm(rectangulo);
                         Thread.Sleep(250);
                     }
-                }).Start();
+                });
+
+            chivato.SetApartmentState(ApartmentState.MTA);
+            chivato.IsBackground = true;
+            chivato.CurrentCulture = System.Globalization.CultureInfo.CurrentCulture;
+            chivato.Priority = ThreadPriority.Highest;
+            chivato.Name = "WindowHookWorkerThread";
+
+            chivato.Start();
+            //chivato.Join();
         }
         
     }

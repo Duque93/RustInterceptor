@@ -17,9 +17,21 @@ namespace Rust_Interceptor.Data {
 
 		public UInt32 UID { get { return proto.baseNetworkable.uid; } private set { proto.baseNetworkable.uid = value; } }
 		public Vector3 Position { get { return proto.baseEntity.pos;} private set { proto.baseEntity.pos = value; } }
-		public Vector3 Rotation { get { return proto.baseEntity.rot; }private set { proto.baseEntity.rot = value; } }
+		public Vector3 Rotation { get { return proto.baseEntity.rot;} private set { proto.baseEntity.rot = value; } }
 
-		static Dictionary<UInt32, Entity> entities = new Dictionary<uint, Entity>();
+
+        public override string ToString()
+        {
+            return "{"
+                + "\n\tnetworkOrder =" + networkOrder
+                + "\n\t Data = " + Data.ToString()
+                + "\n\t UID  = " + UID
+                + "\n\t Position = {\n\t" + Position.ToString() + "\n}"
+                + "\n\t Rotation = {\n\t" + Rotation.ToString() + "\n}"
+                +"}";
+        }
+
+        static Dictionary<UInt32, Entity> entities = new Dictionary<uint, Entity>();
 		public static Entity GetLocalPlayer() {
 			return First(item => item.Value.IsLocalPlayer);
 		}
@@ -118,7 +130,5 @@ namespace Rust_Interceptor.Data {
 			internal Vector3 rotation;
 			public Vector3 Rotation { get { return rotation; } }
 		}
-
-
-	}
+    }
 }

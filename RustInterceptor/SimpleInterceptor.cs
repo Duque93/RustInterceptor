@@ -57,7 +57,7 @@ namespace Rust_Interceptor {
 					Console.WriteLine("Try again...");
 				}
 			}
-			Interceptor = new RustInterceptor(ip, port);
+			Interceptor = RustInterceptor.getInstance(ip, port);
 			Interceptor.AddPacketsToFilter(Packet.Rust.Entities, Packet.Rust.EntityDestroy, Packet.Rust.EntityPosition);
 			Interceptor.commandCallback = OnCommand;
 			Interceptor.packetHandlerCallback = internalOnPacket;

@@ -104,28 +104,37 @@
     <Compile Include="Forms\Controller.Designer.cs">
       <DependentUpon>Controller.cs</DependentUpon>
     </Compile>
-    <Compile Include="Forms\Hooks\WindowHook.cs" />
+    <Compile Include="Forms\Hooks\IKeyEventsListener.cs" />
+    <Compile Include="Forms\Hooks\UKeyActions.cs" />
+    <Compile Include="Forms\Hooks\UKeyHook.cs" />
+    <Compile Include="Forms\Hooks\Window\WindowHook.cs" />
     <Compile Include="Forms\Overlay.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Forms\Overlay.Designer.cs">
       <DependentUpon>Overlay.cs</DependentUpon>
     </Compile>
-    <Compile Include="Forms\Utils\ControllerSystemInfo.cs" />
+    <Compile Include="Forms\LoadForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\LoadForm.Designer.cs">
+      <DependentUpon>LoadForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\Utils\SystemInfo.cs" />
     <Compile Include="Forms\Structs\WindowStruct.cs" />
     <Compile Include="Forms\Utils\DLLImports.cs" />
     <Compile Include="Forms\Utils\DrawingUtils.cs" />
     <Compile Include="Program.cs" />
-    <Compile Include="ProtoGen.cs" />
+    <Compile Include="DataHandler\ProtoGen.cs" />
     <Compile Include="SimpleInterceptor.cs" />
-    <Compile Include="ObjectDumper.cs" />
+    <Compile Include="DataHandler\ObjectDumper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RustInterceptor.cs" />
+    <Compile Include="DataHandler\RustInterceptor.cs" />
     <Compile Include="Internal\RakNetNative.cs" />
-    <Compile Include="Packet.cs" />
+    <Compile Include="DataHandler\Packet.cs" />
     <Compile Include="Internal\RakNetPeer.cs" />
-    <Compile Include="Serializer.cs" />
-    <Compile Include="StringPool.cs" />
+    <Compile Include="DataHandler\Serializer.cs" />
+    <Compile Include="DataHandler\StringPool.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -146,6 +155,14 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\Overlay.resx">
       <DependentUpon>Overlay.cs</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\LoadForm.es.resx">
+      <DependentUpon>LoadForm.cs</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\LoadForm.resx">
+      <DependentUpon>LoadForm.cs</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
   </ItemGroup>

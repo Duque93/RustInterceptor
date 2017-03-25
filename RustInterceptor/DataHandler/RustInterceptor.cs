@@ -14,6 +14,21 @@ using System.Windows.Forms;
 
 namespace Rust_Interceptor {
 	public class RustInterceptor {
+
+        private static RustInterceptor instance;
+        public static RustInterceptor getInstance(string server = "127.0.0.1", int port = 28015, int listenPort = 5678)
+        {
+            if (instance == null) instance = new RustInterceptor(server,port, listenPort);
+            else
+            {
+                instance.serverIP = server;
+                instance.serverPort = port;
+                instance.listenPort = listenPort;
+            }
+            return instance;
+        }
+
+
 		public bool ClientPackets = false;
 		public bool RememberPackets = false;
 		public bool RememberFilteredOnly = false;
@@ -44,19 +59,19 @@ namespace Rust_Interceptor {
 
 		internal RakNetPeer clientPeer;
 		internal RakNetPeer serverPeer;
-		internal readonly Thread backgroundThread;
+		internal Thread backgroundThread;
 
 		internal Action<Packet> packetHandlerCallback = null;
 		internal Action<string> commandCallback = null;
 
-		public RustInterceptor(string server = "127.0.0.1", int port = 28015, int listenPort = 5678) {
+		private RustInterceptor(string server = "127.0.0.1", int port = 28015, int listenPort = 5678) {
 			StringPool.Fill();
 			serverIP = server;
 			serverPort = port;
 			this.listenPort = listenPort;
 			serverPacket = new Packet();
-			clientPacket = new Packet();
-			backgroundThread = new Thread(BackgroundThread);
+			//clientPacket = new Packet();
+			//backgroundThread = new Thread(BackgroundThread);
 			packetQueue = new Queue<Packet>();
 			remeberedPackets = new List<Packet>();
 			packetFilter = new List<Packet.Rust>();
@@ -91,9 +106,18 @@ namespace Rust_Interceptor {
 		}
 
 		public void Start() {
+            backgroundThread = new Thread(BackgroundThread);
+
+                backgroundThread.SetApartmentState(ApartmentState.MTA); //ADDED
+                backgroundThread.Priority = ThreadPriority.Highest;
+                backgroundThread.IsBackground = true;
+                backgroundThread.CurrentCulture = System.Globalization.CultureInfo.CurrentCulture;
+                backgroundThread.Name = "RustInterceptorMainWorker";
+            
 			isAlive = true;
-			backgroundThread.Start();
-		}
+            backgroundThread.Start();
+            //backgroundThread.Join();//ADDED
+        }
 
 		public void Stop() {
 			isAlive = false;
@@ -146,13 +170,21 @@ namespace Rust_Interceptor {
                 MessageBox.Show("Se ha copiado en tu portapeles el contenido : \n " + Clipboard.GetText());
             });
            
-			thread.SetApartmentState(ApartmentState.STA);
-			thread.Start();
+			thread.SetApartmentState(ApartmentState.STA); //Hace falta para escribir en el Clipboard
+            thread.IsBackground = true;
+            thread.CurrentCulture = System.Globalization.CultureInfo.CurrentCulture;
+            thread.Priority = ThreadPriority.Lowest;
+            thread.Name = "RustInterceptorNotificadorPortapapeles";
+
+            thread.Start();
 			thread.Join();
+
 			Console.WriteLine("Server address copied to Clipboard (F1 -> Paste -> Enter)");
 			Console.WriteLine("Listening on {0}", listenPort);
-			clientPeer = RakNetPeer.CreateServer("0.0.0.0", listenPort, 1);
-			var emptyPacket = false;
+
+            clientPacket = new Packet();
+            clientPeer = RakNetPeer.CreateServer("0.0.0.0", listenPort, 1);
+            var emptyPacket = false;
 			var hasClientPacket = false;
 			var hasServerPacket = false;
 			while (isAlive) {
@@ -244,6 +276,8 @@ namespace Rust_Interceptor {
 				}
 
 			}
-		}
+            clientPeer.Close();
+            clientPacket.Close();
+        }
 	}
 }

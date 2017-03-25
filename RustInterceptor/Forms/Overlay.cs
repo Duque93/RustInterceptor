@@ -20,130 +20,185 @@ namespace Rust_Interceptor.Forms
     public partial class Overlay : Form
     {
         //Parametros necesarios para simular el desplazamiento del Form
-        private bool mouseDown;
         private Point lastLocation;
         //////////////////////////////////////////
 
         public volatile bool working = false;
-        private RustInterceptor sniffer;
-        private Thread worker;
-        private Process rustProcess;
-        private readonly String rustProcessName = "RustClient";
 
-        private ConcurrentDictionary<uint,Entity> listaUsuarios = new ConcurrentDictionary<uint, Entity>();
-        //private HashSet<Entity> listaUsuarios = new HashSet<Entity>();
+        private RustInterceptor sniffer;
+        private Process targetProcess;
+
+        private Thread worker, cleaner;
+
+        private ConcurrentDictionary<String,Entity> listaUsuarios = new ConcurrentDictionary<String, Entity>();
         private Entity localPlayer;
 
-        Graphics g;
+        private Graphics g;
+        private DrawingUtils pintor;
+        private RECTANGULO rectRadar;
+        
 
-        public Overlay()
+        private static Overlay instance;
+        public static Overlay getInstance(Process targetProcess)
         {
-            this.Location = new Point(0, 0);
+            if (instance == null) instance = new Overlay(targetProcess);
+            return instance;
+        }
+
+        private Overlay(Process targetProcess)
+        {
+            this.targetProcess = targetProcess;
             InitializeComponent();
-        }
-
-        private void Overlay_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            this.working = false;
-        }
-
-        private void Overlay_Load(object sender, EventArgs e)
-        {
-            //this.MaximumSize = this.Size;
-            //g = this.CreateGraphics();
-            this.labelIp.Click += new EventHandler(
-                (object responsable, EventArgs evento) =>
-                {
-                    this.textBoxIp.Focus();
-                });
-            this.labelPuerto.Click += new EventHandler(
-                (object responsable, EventArgs evento) =>
-                {
-                    this.textBoxPuerto.Focus();
-                });
-            this.buttonEmpezar.Click += new EventHandler(
-                (object responsable, EventArgs evento) =>
-                {
-                    if (this.textBoxIp.Text.Length == 0 && this.textBoxPuerto.Text.Length == 0)
-                        return;
-                    if (this.textBoxIp.Text.Equals("debug"))
-                    {
-                        this.hideControls();
-                        this.Size = new Size(ControllerSystemInfo.getSystemInfo(ControllerSystemInfo.SystemMetric.SM_CXFULLSCREEN), ControllerSystemInfo.getSystemInfo(ControllerSystemInfo.SystemMetric.SM_CYFULLSCREEN));
-                        
-                        this.worldToScreen();
-                        return;
-                    }
-
-                    //this.working = true;
-                    sniffer = new RustInterceptor( this.textBoxIp.Text, Convert.ToInt32(this.textBoxPuerto.Text) );
-                    sniffer.AddPacketsToFilter(Packet.Rust.Entities, Packet.Rust.EntityDestroy, Packet.Rust.EntityPosition);
-                    sniffer.packetHandlerCallback = packetHandler;
-                    sniffer.RememberPackets = true;
-                    this.prepareOverlay();
-                });
-
-        }
-
-        //Sobreescribe WndProc para permitir que el evento de despalzar el Form siga siendo posible
-        protected override void WndProc(ref System.Windows.Forms.Message m)
-        {
-            switch (m.Msg)
-            {
-                case 0x84:
-                    base.WndProc(ref m);
-                    if ((int)m.Result == 0x1)
-                        m.Result = (IntPtr)0x2;
-                    return;
-            }
-
-            base.WndProc(ref m);
+            
         }
 
         //Oculta todos los elementos para poder tener un overlayForm
-        public void prepareOverlay()
+        public void start(String server, int port)
         {
+            sniffer = RustInterceptor.getInstance(server, port);
             this.hideControls();
-            this.labelPlayers.Visible = true;
+            pintor = DrawingUtils.getInstance();
+            //Hilo que se encargara de ir limpiando las entidades que esten muy lejos o no merezca la pena espiar.
+            cleaner = new Thread(
+                () =>
+                {
+                    do
+                    {
+                        if (localPlayer != null)
+                        {
+                            List<KeyValuePair<String, Entity>> filas = this.listaUsuarios.ToList<KeyValuePair<String, Entity>>();
+                            foreach (KeyValuePair<String, Entity> fila in filas)
+                            {
+                                if (fila.Value == null) return;
+                                Entity entidad = fila.Value;
+                                
+                                float distance = UnityEngine.Vector2.Distance(
+                                    new UnityEngine.Vector2(entidad.Data.baseEntity.pos.x, entidad.Data.baseEntity.pos.z)
+                                    ,
+                                    new UnityEngine.Vector2(this.localPlayer.Data.baseEntity.pos.x, this.localPlayer.Data.baseEntity.pos.z));
+                                if (distance > pintor.getController().getZoomValue() || entidad.Data.basePlayer.modelState.onground && !entidad.Data.basePlayer.modelState.sleeping )
+                                    this.listaUsuarios.TryRemove(fila.Key, out entidad);
+                            }
+                        }
+                        Thread.Sleep(5*1000);
+                       
+                    } while (working);
+                });
 
-            Controller.getInstance().mostrarse();
+            cleaner.SetApartmentState(ApartmentState.MTA);
+            cleaner.IsBackground = true;
+            cleaner.CurrentCulture = System.Globalization.CultureInfo.CurrentCulture;
+            cleaner.Priority = ThreadPriority.BelowNormal;
+            cleaner.Name = "OverlayCleanerThread";
+
             //Creo un Hilo que se encargara de hacer todo el curro
             worker = new Thread(
                 () =>
                 {
-                    Thread.CurrentThread.IsBackground = true;
-                    Thread.CurrentThread.Name = "OverlayWorkerThread";
-                    while( rustProcess == null ) // Iteramos hasta que el proceso Rust se haya inicializado y lo capturamos
-                    {
-                        Console.WriteLine("Buscando proceso de Rust...");
-                        searchRustProcess(out rustProcess);
-                        Thread.Sleep(1 * 1000);
-                    }
-                    rustProcess.EnableRaisingEvents = true;
-                    rustProcess.Exited += new EventHandler( //En cuanto se cierre Rust, cerramos todo
+                    targetProcess.EnableRaisingEvents = true;
+                    targetProcess.Exited += new EventHandler( //En cuanto se cierre Rust, cerramos OVerlay
                         (object sender, EventArgs e) =>
                         {
-                            this.Cerrar();
+                            this.Stop();
                         });
                     
                     //¿Porque ha dejado de funcionar de pronto?
                     //Puede ser por el cambio de propiedades de int a float que hice en RECTANGULO
-                    //new WindowHook(rustProcess.MainWindowHandle, this); //De momento esta clase se ocupa directamente de redimensionar la ventana
+                    //new WindowHook(targetProcess.MainWindowHandle, this); //De momento esta clase se ocupa directamente de redimensionar la ventana
                     this.resizeForm(new RECTANGULO());
+
 
                     sniffer.Start();
                     while( this.localPlayer == null) //Esperamos hasta que tengamos el localplayer
                     {
                         Thread.Sleep(1000);
+                        Console.WriteLine("No me he encontrado...Sigo buscandome");
                     }
                     Console.WriteLine("Me he encontrado");
+
                     working = true;
-                    
-                    this.worldToScreen();
+                    cleaner.Start();
+                    //cleaner.Join();
+                    do
+                    {
+                        this.worldToScreen();
+                        Thread.Sleep(100);
+                    } while (working);
                     
                 });
 
+            worker.SetApartmentState(ApartmentState.MTA);
+            worker.IsBackground = true;
+            worker.CurrentCulture = System.Globalization.CultureInfo.CurrentCulture;
+            worker.Priority = ThreadPriority.Highest;
+            worker.Name = "OverlayWorkerThread";
+
             worker.Start();
+            //worker.Join();
+
+            this.Show();
+        }
+        public void Stop()
+        {
+            if (this.InvokeRequired) this.Invoke(new genericCallback(Stop));
+            else
+            {
+                this.working = false;
+                if (sniffer != null)
+                {
+                    if (sniffer.IsAlive)
+                    {
+                        sniffer.Stop();
+                        //sniffer.SavePackets();
+                    }
+                }
+                this.Close();
+                instance = null;
+            }
+        }
+
+        //Se ocupara de mostrar en el overlay todo las entidades que nos interesa
+        private delegate void genericCallback();
+        private void worldToScreen()
+        {
+            if (this.InvokeRequired) this.Invoke(new genericCallback(this.worldToScreen));
+            else
+            {
+                if(g == null) g = this.CreateGraphics();
+                g.Clear(Color.Black);
+                pintor.drawCrosshair(g, Color.FromArgb(128, Color.Red), this.ClientRectangle);
+
+                int radio = 75;
+                POINT init = new POINT(this.Right - (radio * 2 + 5), this.Top + 8); //A la derecha con margenes para ver el radar al completo
+                
+                pintor.drawRadar(g, Color.FromArgb(10, Color.Gray), init, this.localPlayer, out this.rectRadar); // this.listaUsuarios.Values.ToList());
+
+                if (this.localPlayer == null) return;
+
+                pintor.drawRadarPlayer(g, this.localPlayer, this.localPlayer, rectRadar.CenterAbsolute);
+                List<Entity> jugadores = this.listaUsuarios.Values.ToList();
+                foreach(Entity jugador in jugadores)
+                {
+                    pintor.drawRadarPlayer(g,this.localPlayer,jugador,rectRadar.CenterAbsolute);
+                    //pintor.drawPlayer(g, this.localPlayer, jugador, this.ClientRectangle);
+                }
+
+            }
+
+        }
+        private delegate void resizeFormCallback(RECTANGULO rectangulo);
+        public void resizeForm(RECTANGULO rectangulo)
+        {
+            if (this.InvokeRequired) this.Invoke(new resizeFormCallback(resizeForm),rectangulo);
+            else
+            {
+                int offsetWindowBar = 20;
+                this.Size = rectangulo.Size;
+                //this.Size = new Size(SystemInfo.getSystemInfo(SystemInfo.SystemMetric.SM_CXFULLSCREEN), SystemInfo.getSystemInfo(SystemInfo.SystemMetric.SM_CYFULLSCREEN)+ offsetWindowBar);
+                //Setting Window position;
+                this.Top = (int)rectangulo.Top;
+                this.Left = (int)rectangulo.Left;
+            }
         }
         private void hideControls()
         {
@@ -151,22 +206,15 @@ namespace Rust_Interceptor.Forms
             {
                 ctrl.Visible = false;
             }
-            this.BackColor = Color.Green; //Seteamos el color de fondo a negro.
-            this.TransparencyKey = Color.Green; //Indicamos que todo lo que se encuentre en negro dentro del formulario sea transparente
-
+            this.BackColor = Color.Black; //Seteamos el color de fondo a negro.
+            this.TransparencyKey = Color.Black; //Indicamos que todo lo que se encuentre en negro dentro del formulario sea transparente
+            //Metodo para que pulsar atraves de él sea posible
             int initialStyle = DLLImports.GetWindowLong(this.Handle, -20);
             DLLImports.SetWindowLong(this.Handle, -20, initialStyle | 0x80000 | 0x20);
         }
-        private void searchRustProcess(out Process proceso)
-        {
-            Process[] procesos = Process.GetProcessesByName(rustProcessName);
-            proceso = null;
-            if (procesos.Length > 0)
-            {
-                Console.WriteLine("Proceso encontrado");
-                proceso = procesos[0];
-            }
-        }
+
+
+
         private void packetHandler(Packet packet)
         {
             Entity entity;
@@ -191,7 +239,7 @@ namespace Rust_Interceptor.Forms
                         entities = Entity.UpdatePositions(updates);
                     }
                     if (entities != null) entities.ForEach(item => onEntity(item));
-                    
+
                     return;
                 case Packet.Rust.EntityDestroy:
                     EntityDestroy destroyInfo = new EntityDestroy(packet);
@@ -200,11 +248,10 @@ namespace Rust_Interceptor.Forms
                     return;
             }
         }
-
         private delegate void onEntityCallback(Entity entidad);
         private void onEntity(Entity entidad)
         {
-            if (this.InvokeRequired) this.Invoke(new onEntityCallback(onEntity) , entidad );
+            if (this.InvokeRequired) this.Invoke(new onEntityCallback(onEntity), entidad);
             else
             {
                 if (entidad.IsPlayer)
@@ -212,26 +259,33 @@ namespace Rust_Interceptor.Forms
                     if (entidad.IsLocalPlayer)
                     {
                         this.localPlayer = entidad;
+                        if (this.localPlayer.Data.basePlayer.metabolism.health == 0) //FIXME . No borra cuando mi vida llega a 0 
+                        {
+
+                            this.listaUsuarios.Clear();
+                        }
                         return;
                     }
-                    if(this.localPlayer != null)
+                    if (this.localPlayer != null)
                     {
-                        lock(this.listaUsuarios)
+                        lock (this.listaUsuarios)
                         {
+                            Entity prev = null;
                             //Una especie de OnAcercarse()
-                            //if (UnityEngine.Vector3.Distance(entidad.Data.baseEntity.pos, this.localPlayer.Data.baseEntity.pos) < 1000)
+                            float distance = UnityEngine.Vector2.Distance(
+                                new UnityEngine.Vector2(entidad.Data.baseEntity.pos.x, entidad.Data.baseEntity.pos.z)
+                                ,
+                                new UnityEngine.Vector2(this.localPlayer.Data.baseEntity.pos.x, this.localPlayer.Data.baseEntity.pos.z));
+
+                            if (distance < pintor.getController().getZoomValue())
                             {
-                                /*
-                                if (this.listaUsuarios.Keys.Contains(entidad.UID)) //Si no lo contiene
-                                    this.listaUsuarios.
-                                    this.listaUsuarios.TryRemove(entidad.UID);*/
-                                this.listaUsuarios.TryAdd(entidad.UID, entidad);
+                                this.listaUsuarios.TryGetValue(entidad.Data.basePlayer.name, out prev);
+                                if (prev == null) this.listaUsuarios.TryAdd(entidad.Data.basePlayer.name, entidad);
+                                else this.listaUsuarios.TryUpdate(entidad.Data.basePlayer.name, entidad, prev);
                             }
-                            /*else
-                                this.listaUsuarios.TryRemove(entidad.UID,out entidad);*/
                         }
                     }
-                    
+
                 }
             }
         }
@@ -241,89 +295,11 @@ namespace Rust_Interceptor.Forms
             if (this.InvokeRequired) this.Invoke(new onEntityDestroyCallback(onEntityDestroy), entidadDestruida);
             else
             {
-                lock (this.listaUsuarios)
-                {
-                    Entity entidad;
-                    this.listaUsuarios.TryGetValue(entidadDestruida.UID,out entidad);
-                    if (this.listaUsuarios.TryRemove(entidadDestruida.UID, out entidad))
-                    {
-                        //Console.WriteLine("Jugador con UID({0}) got destroyed ", entidadDestruida.UID);
-                    }
-                }
-               
             }
-                
-        }
-        //Se ocupara de mostrar en el overlay todo las entidades que nos interesa
-        private delegate void genericCallback();
-        private void worldToScreen()
-        {
-            //if (this.InvokeRequired) this.Invoke(new genericCallback(worldToScreen));
-            //else
-            do
-            {
-                g = this.CreateGraphics();
-                g.Clear(Color.Green);
-                DrawingUtils.drawCrosshair(g, Color.FromArgb(128, Color.Red), this.ClientRectangle);
-
-                int radio = 75;
-                POINT init = new POINT(this.Right - (radio * 2 + 5), this.Top + 8); //A la derecha con margenes para ver el radar al completo
-
-                DrawingUtils.drawRadar( g, Color.FromArgb(10, Color.Gray), init, this.localPlayer, this.listaUsuarios.Values.ToList() );
-                //DrawingUtils.drawRadar(g, Color.FromArgb(10, Color.Gray), init, this.localPlayer, Entity.GetPlayers().ToList() );
-                Thread.Sleep(150);
-            } while (working);
-
 
         }
-        private delegate void resetTextCallback(Control elemento);
-        private void resetText(Control elemento)
-        {
-            if (this.InvokeRequired) this.Invoke(new resetTextCallback(resetText), elemento);
-            else
-            {
-                elemento.ResetText();
-            }
-        }
-        private delegate void appendTextCallback(Control elemento,String cadena);
-        private void appendText(Control elemento, String cadena)
-        {
-            if (this.InvokeRequired) this.Invoke(new appendTextCallback(appendText), elemento, cadena);
-            else
-            {
-                elemento.Text += cadena;
-            }
-        }
-        private delegate void resizeFormCallback(RECTANGULO rectangulo);
-        public void resizeForm(RECTANGULO rectangulo)
-        {
-            if (this.InvokeRequired) this.Invoke(new resizeFormCallback(resizeForm),rectangulo);
-            else
-            {
-                //this.Size = rectangulo.Size;
-                this.Size = new Size(ControllerSystemInfo.getSystemInfo(ControllerSystemInfo.SystemMetric.SM_CXFULLSCREEN), ControllerSystemInfo.getSystemInfo(ControllerSystemInfo.SystemMetric.SM_CYFULLSCREEN));
-                //Setting Window position;
-                this.Top = rectangulo.Top;
-                this.Left =rectangulo.Left;
-            }
-        }
 
-        private void Cerrar()
-        {
-            if (this.InvokeRequired) this.Invoke(new genericCallback(Cerrar));
-            else
-            {
-                this.working = false;
-                if (sniffer != null)
-                {
-                    if (sniffer.IsAlive)
-                    {
-                        sniffer.Stop();
-                        //sniffer.SavePackets();
-                    }
-                }
-                this.Close();
-            }
-        }
+
+
     }
 }

@@ -15,9 +15,10 @@ namespace Rust_Interceptor
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Forms.Overlay());
+            Application.Run(Forms.LoadForm.getInstance());
         }
 
+        [MTAThread]
         private static void Main(string[] args)
         {
             new Program();

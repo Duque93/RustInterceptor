@@ -8,122 +8,7 @@ namespace Rust_Interceptor.Forms.Structs
 {
     public static class WindowStruct
     {
-        /// <summary>
-        /// 
-        /// </summary>
-        [StructLayout(LayoutKind.Sequential)]
-        public struct RECTANGULO
-        {
-            public int Left, Top, Right, Bottom;
-
-            public RECTANGULO(int left, int top, int right, int bottom)
-            {
-                Left = left;
-                Top = top;
-                Right = right;
-                Bottom = bottom;
-            }
-
-            public RECTANGULO(System.Drawing.Rectangle r) : this(r.Left, r.Top, r.Right, r.Bottom) { }
-
-            public int X
-            {
-                get { return Left; }
-                set { Right -= (Left - value); Left = value; }
-            }
-
-            public int Y
-            {
-                get { return Top; }
-                set { Bottom -= (Top - value); Top = value; }
-            }
-
-            public int Height
-            {
-                get { return Bottom - Top; }
-                set { Bottom = value + Top; }
-            }
-
-            public int Width
-            {
-                get { return Right - Left; }
-                set { Right = value + Left; }
-            }
-
-            public System.Drawing.Point Location
-            {
-                get { return new System.Drawing.Point((int)Left, (int)Top); }
-                set { X = value.X; Y = value.Y; }
-            }
-
-            public System.Drawing.Size Size
-            {
-                get { return new System.Drawing.Size((int)Width, (int)Height); }
-                set { Width = value.Width; Height = value.Height; }
-            }
-            public SharpDX.Vector2 CenterRelative
-            {
-                get { return new SharpDX.Vector2(this.Width/2, this.Height/2); }
-            }
-
-            public SharpDX.Vector2 CenterAbsolute
-            {
-                get { return new SharpDX.Vector2( (this.Width / 2)+this.Left , (this.Height / 2)+this.Top ) ; }
-            }
-
-            public static implicit operator RECTANGULO(System.Drawing.Size r)
-            {
-                return new RECTANGULO(0, 0, r.Width, r.Height);
-            }
-            public static implicit operator System.Drawing.Rectangle(RECTANGULO r)
-            {
-                return new System.Drawing.Rectangle((int)r.Left, (int)r.Top, (int)r.Width, (int)r.Height);
-            }
-
-            public static implicit operator System.Drawing.RectangleF(RECTANGULO r)
-            {
-                return new System.Drawing.RectangleF(r.Left, r.Top, r.Width, r.Height);
-            }
-
-            public static implicit operator RECTANGULO(System.Drawing.Rectangle r)
-            {
-                return new RECTANGULO(r);
-            }
-
-            public static bool operator ==(RECTANGULO r1, RECTANGULO r2)
-            {
-                return r1.Equals(r2);
-            }
-
-            public static bool operator !=(RECTANGULO r1, RECTANGULO r2)
-            {
-                return !r1.Equals(r2);
-            }
-
-            public bool Equals(RECTANGULO r)
-            {
-                return r.Left == Left && r.Top == Top && r.Right == Right && r.Bottom == Bottom;
-            }
-
-            public override bool Equals(object obj)
-            {
-                if (obj is RECTANGULO)
-                    return Equals((RECTANGULO)obj);
-                else if (obj is System.Drawing.Rectangle)
-                    return Equals(new RECTANGULO((System.Drawing.Rectangle)obj));
-                return false;
-            }
-
-            public override int GetHashCode()
-            {
-                return ((System.Drawing.Rectangle)this).GetHashCode();
-            }
-
-            public override string ToString()
-            {
-                return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{{Left={0},Top={1},Right={2},Bottom={3}}}", Left, Top, Right, Bottom);
-            }
-        }
+        #region StructsWindow
 
         public enum EnumShowWindowCommands
         {
@@ -250,15 +135,276 @@ namespace Rust_Interceptor.Forms.Structs
             }
         }
 
+        #endregion StructsWindow
+
+        #region StructsHooks
+
+        /// <summary>
+        /// https://msdn.microsoft.com/en-us/library/windows/desktop/ms644990(v=vs.85).aspx
+        /// </summary>
+        public enum HookType : int
+        {
+            WH_MSGFILTER = -1,
+            WH_JOURNALRECORD = 0,
+            WH_JOURNALPLAYBACK = 1,
+            /// <summary>
+            /// BaseHook que capturara todas las teclas del teclado pulsadas por el usuario en la ventana DE UN PROCESO
+            /// </summary>
+            WH_KEYBOARD = 2,
+            WH_GETMESSAGE = 3,
+            /// <summary>
+            /// Installs a hook procedure that monitors messages before the system sends them to the destination window procedure. For more information, see the CallWndProc hook procedure.
+            /// </summary>
+            WH_CALLWNDPROC = 4,
+            WH_CBT = 5,
+            WH_SYSMSGFILTER = 6,
+            /// <summary>
+            /// BaseHook que capturara todos los botones y movimientos del raton ejecutados por el usuario
+            /// en la ventana dde un PROCESO
+            /// </summary>
+            WH_MOUSE = 7,
+            WH_HARDWARE = 8,
+            WH_DEBUG = 9,
+            WH_SHELL = 10,
+            WH_FOREGROUNDIDLE = 11,
+            /// <summary>
+            /// Installs a hook procedure that monitors messages after they have been processed by the destination window procedure. For more information, see the CallWndRetProc hook procedure.
+            /// </summary>
+            WH_CALLWNDPROCRET = 12,
+            /// <summary>
+            /// BaseHook que capturara todos las teclas del teclado pulsadas por el usuario. Necesario llamar a 
+            /// CallNextHookEx para propagar el evento y permitir a otras apliciones seguir capturando el evento
+            /// </summary>
+            WH_KEYBOARD_LL = 13,
+            /// <summary>
+            /// BaseHook que capturara las pulsaciones y movimientos del raton realizadas por el usuario.Necesario llamar a 
+            /// CallNextHookEx para propagar el evento y permitir a otras apliciones seguir capturando el evento
+            /// </summary>
+            WH_MOUSE_LL = 14,
+        }
+
+        public enum MouseEventType : int
+        {  //Siempre usar hexadecimales pues se mantiene mejor la compatibilidad entre versiones del SO de Windows
+            NONE = 0,
+            WM_MOUSEMOVE = 0x0200, //512,
+            WM_LBUTTONDOWN = 0x0201, //513,
+            WM_LBUTTONUP = 0x0202, //514,
+            WM_RBUTTONDOWN = 0x0204, //516,
+            WM_RBUTTONUP = 0x0205, //517,
+            WM_MBUTTONDOWN = 0x0207, //519,
+            WM_MBUTTONUP = 0x0208, //520,
+            WM_MOUSEWHEEL = 0x020A, //522,
+            WM_MOUSEHWHEEL = 0x020E, //526
+        }
+        //https://msdn.microsoft.com/es-es/library/windows/desktop/ms646260(v=vs.85).aspx Parameters section
+        public enum MouseFlags : int
+        {
+            MOUSEEVENTF_MOVE = 0x0001, //1,
+            MOUSEEVENTF_LEFTDOWN = 0x0002, //2,
+            MOUSEEVENTF_LEFTUP = 0x0004, //4,
+            MOUSEEVENTF_RIGHTDOWN = 0x0008, //8,
+            MOUSEEVENTF_RIGHTUP = 0x0010, //16,
+            MOUSEEVENTF_MIDDLEDOWN = 0x0020, //32,
+            MOUSEEVENTF_MIDDLEUP = 0x0040, //64,
+            MOUSEEVENTF_XDOWN = 0x0080, //128,
+            MOUSEEVENTF_XUP = 0x0100, //256,
+            MOUSEEVENTF_WHEEL = 0x0800, //2048,
+            MOUSEEVENTF_HWHEEL = 0x01000, //4096,
+            /// <summary>
+            /// The dx and dy parameters contain normalized absolute coordinates. If not set, those parameters contain 
+            /// relative data: the change in position since the last reported position. This flag can be set, or not set, 
+            /// regardless of what kind of mouse or mouse-like device, if any, is connected to the system. For further information
+            /// about relative mouse motion, see the following Remarks section.
+            /// </summary>
+            MOUSEEVENTF_ABSOLUTE = 0x8000, //32768,
+            MOUSE_MOVE_ABSOLUTE = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE,
+
+        }
+        //LPARAM --> IntPTr
+        //WPARAM -->UIntrPtr
+        //ULONG_PTR --> IntPtr
+        //DWORD --> uint
+        //LONG --> int
+        //WORD --> ushort
+        //https://msdn.microsoft.com/es-es/library/windows/desktop/ms646270(v=vs.85).aspx
+        [StructLayout(LayoutKind.Sequential)]
+        public struct INPUT
+        {
+            public uint tipo; //0 --> MOUSENINPUT, 1 --> KEYBDINPUT, 2 --> HARDWAREINPUT
+            public DataInput data;
+        }
+        [StructLayout(LayoutKind.Explicit)]
+        public struct DataInput
+        {
+            [FieldOffset(0)]
+            public MOUSEINPUT mouse;
+            [FieldOffset(0)]
+            public KEYBDINPUT keyboard;
+            [FieldOffset(0)]
+            public HARDWAREINPUT hardware;
+        }
+
+        //https://msdn.microsoft.com/es-es/library/windows/desktop/ms646273(v=vs.85).aspx
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MOUSEINPUT
+        {
+            public int dx;
+            public int dy;
+            public uint mouseData;
+            public uint dwFlags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+        //https://msdn.microsoft.com/es-es/library/windows/desktop/ms646271(v=vs.85).aspx
+        [StructLayout(LayoutKind.Sequential)]
+        public struct KEYBDINPUT
+        {
+            public ushort codeVirtualKey;
+            public ushort wScan;
+            public uint dwFlags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+        //https://msdn.microsoft.com/es-es/library/windows/desktop/ms646269(v=vs.85).aspx
+        [StructLayout(LayoutKind.Sequential)]
+        public struct HARDWAREINPUT
+        {
+            public uint uMsg;
+            public ushort wParamL;
+            public ushort wParamH;
+        }
+
+        #endregion StructsHooks
+
+        #region StructGeometry
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECTANGULO
+        {
+            public float Left, Top, Right, Bottom;
+
+            public RECTANGULO(float left, float top, float right, float bottom)
+            {
+                Left = left;
+                Top = top;
+                Right = right;
+                Bottom = bottom;
+            }
+
+            public RECTANGULO(System.Drawing.Rectangle r) : this(r.Left, r.Top, r.Right, r.Bottom) { }
+
+            public float X
+            {
+                get { return Left; }
+                set { Right -= (Left - value); Left = value; }
+            }
+
+            public float Y
+            {
+                get { return Top; }
+                set { Bottom -= (Top - value); Top = value; }
+            }
+
+            public float Height
+            {
+                get { return Bottom - Top; }
+                set { Bottom = value + Top; }
+            }
+
+            public float Width
+            {
+                get { return Right - Left; }
+                set { Right = value + Left; }
+            }
+
+            public System.Drawing.Point Location
+            {
+                get { return new System.Drawing.Point((int)Left, (int)Top); }
+                set { X = value.X; Y = value.Y; }
+            }
+
+            public System.Drawing.Size Size
+            {
+                get { return new System.Drawing.Size((int)Width, (int)Height); }
+                set { Width = value.Width; Height = value.Height; }
+            }
+            public SharpDX.Vector2 CenterRelative
+            {
+                get { return new SharpDX.Vector2(this.Width/2, this.Height/2); }
+            }
+
+            public SharpDX.Vector2 CenterAbsolute
+            {
+                get { return new SharpDX.Vector2( (this.Width / 2)+this.Left , (this.Height / 2)+this.Top ) ; }
+            }
+
+            public static implicit operator RECTANGULO(System.Drawing.Size r)
+            {
+                return new RECTANGULO(0, 0, r.Width, r.Height);
+            }
+            public static implicit operator System.Drawing.Rectangle(RECTANGULO r)
+            {
+                return new System.Drawing.Rectangle((int)r.Left, (int)r.Top, (int)r.Width, (int)r.Height);
+            }
+
+            public static implicit operator System.Drawing.RectangleF(RECTANGULO r)
+            {
+                return new System.Drawing.RectangleF(r.Left, r.Top, r.Width, r.Height);
+            }
+
+            public static implicit operator RECTANGULO(System.Drawing.Rectangle r)
+            {
+                return new RECTANGULO(r);
+            }
+
+            public static bool operator ==(RECTANGULO r1, RECTANGULO r2)
+            {
+                return r1.Equals(r2);
+            }
+
+            public static bool operator !=(RECTANGULO r1, RECTANGULO r2)
+            {
+                return !r1.Equals(r2);
+            }
+
+            public bool Equals(RECTANGULO r)
+            {
+                return r.Left == Left && r.Top == Top && r.Right == Right && r.Bottom == Bottom;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is RECTANGULO)
+                    return Equals((RECTANGULO)obj);
+                else if (obj is System.Drawing.Rectangle)
+                    return Equals(new RECTANGULO((System.Drawing.Rectangle)obj));
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                return ((System.Drawing.Rectangle)this).GetHashCode();
+            }
+
+            public override string ToString()
+            {
+                return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{{Left={0},Top={1},Right={2},Bottom={3}}}", Left, Top, Right, Bottom);
+            }
+
+            public bool isInArea(POINT a)
+            {
+                return (Left <= a.X && Top <= a.Y && Right >= a.X && Bottom >= a.Y);
+            }
+        }
+
         /// <summary>
         /// 
         /// </summary>
         [StructLayout(LayoutKind.Sequential)]
         public struct POINT
         {
-            public int X,Y;
+            public float X,Y;
 
-            public POINT(int x, int y)
+            public POINT(float x, float y)
             {
                 this.X = x;
                 this.Y = y;
@@ -323,6 +469,9 @@ namespace Rust_Interceptor.Forms.Structs
                 return "{X = "+this.X+" , Y = "+this.Y+"}";
             }
         }
+        #endregion StructGeometry
+
+
 
     }
 }
